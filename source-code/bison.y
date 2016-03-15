@@ -23,8 +23,10 @@ command         :   fgCommand
 
 fgCommand       :   simpleCmd
 ;
-// ...<.>.   头文件
-// ....      一般C语句
+// ...<.
+// ....  
+// ..>.
+// ..<.>.    
 simpleCmd       :   progInvocation inputRedirect outputRedirect
 ;
 
