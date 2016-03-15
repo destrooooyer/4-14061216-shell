@@ -608,3 +608,13 @@ void execute(){
     SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
     execSimpleCmd(cmd);
 }
+
+
+
+
+
+
+
+
+
+//test.c
