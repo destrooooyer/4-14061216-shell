@@ -1,3 +1,5 @@
+//这只是分析程序，最终要编译成一个完整的C程序
+//定义段，出现在最终产生的c文件中
 %{
     #include "global.h"
 
@@ -6,21 +8,25 @@
       
     int offset, len, commandDone;
 %}
-
+//声明标记
 %token STRING
-
+//结束符
 %%
+//当输入符合要求时，将commandDone置1;
 line            :   /* empty */
                     |command                        {   execute();  commandDone = 1;   }
 ;
-
+//命令后面加 & 代表后台运行
 command         :   fgCommand
                     |fgCommand '&'
 ;
 
 fgCommand       :   simpleCmd
 ;
-
+// ...<.
+// ....  
+// ..>.
+// ..<.>.    
 simpleCmd       :   progInvocation inputRedirect outputRedirect
 ;
 
@@ -86,6 +92,7 @@ int yylex(){
 /****************************************************************
                   错误信息执行函数
 ****************************************************************/
+//yacc语法分析程序探测到错误时调用，将错误信息回馈给用户
 void yyerror()
 {
     printf("你输入的命令不正确，请重新输入！\n");
@@ -112,7 +119,7 @@ int main(int argc, char** argv) {
 
         len = i;
         offset = 0;
-        
+        //yacc语法分析程序的入口点，调用开始启动分析。分析成功返回0，否则返回非零值
         yyparse(); //调用语法分析函数，该函数由yylex()提供当前输入的单词符号
 
         if(commandDone == 1){ //命令已经执行完成后，添加历史记录信息

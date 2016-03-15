@@ -1,6 +1,6 @@
 #ifndef _global_H
 #define _global_H
-
+//标志下面的代码是cpp代码，用C的方式去翻译链接
 #ifdef	__cplusplus
 extern "C" {
 #endif   
