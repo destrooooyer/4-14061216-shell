@@ -26,13 +26,13 @@ pid_t fgPid;                     //当前前台作业的进程号
 /*判断命令是否存在*/
 int exists(char *cmdFile){
     int i = 0;
-    if((cmdFile[0] == '/' || cmdFile[0] == '.') && access(cmdFile, F_OK) == 0/*【文件是否存在，返回0存在，-1不存在】*/){ //命令在当前目录
+    if((cmdFile[0] == '/' || cmdFile[0] == '.') && access(cmdFile, F_OK) == 0){ //命令在当前目录
         strcpy(cmdBuff, cmdFile);
         return 1;
     }else{  //查找ysh.conf文件中指定的目录，确定命令是否存在
         while(envPath[i] != NULL){ //查找路径已在初始化时设置在envPath[i]中
             strcpy(cmdBuff, envPath[i]);
-            strcat(cmdBuff, cmdFile);///【连接两个字符串】
+            strcat(cmdBuff, cmdFile);
             
             if(access(cmdBuff, F_OK) == 0){ //命令文件被找到
                 return 1;
@@ -45,8 +45,7 @@ int exists(char *cmdFile){
     return 0; 
 }
 
-///【str[start...end]转化为int，如果有不属于0-9的字符则返回-1】
-/*将字符串转换为整型的Pid*/	
+/*将字符串转换为整型的Pid*/
 int str2Pid(char *str, int start, int end){
     int i, j;
     char chs[20];
@@ -63,7 +62,6 @@ int str2Pid(char *str, int start, int end){
     return atoi(chs);
 }
 
-///【删除str这个字符串第一个'/'及之前的字符】
 /*调整部分外部命令的格式*/
 void justArgs(char *str){
     int i, j, len;
@@ -92,7 +90,7 @@ void setGoon(){
 void release(){
     int i;
     for(i = 0; strlen(envPath[i]) > 0; i++){
-        free(envPath[i]);	//【释放envPath[i]指向的内存空间】
+        free(envPath[i]);
     }
 }
 
@@ -100,7 +98,7 @@ void release(){
                   信号以及jobs相关
 ********************************************************/
 /*添加新的作业*/
-Job* addJob(pid_t pid){	//【pid_t就是int】
+Job* addJob(pid_t pid){
     Job *now = NULL, *last = NULL, *job = (Job*)malloc(sizeof(Job));
     
 	//初始化新的job
@@ -610,3 +608,16 @@ void execute(){
     SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
     execSimpleCmd(cmd);
 }
+
+
+
+
+
+
+
+
+
+//test.c
+
+
+//gfdgfdgfd
