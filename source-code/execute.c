@@ -23,7 +23,7 @@ pid_t fgPid;                     //当前前台作业的进程号
 /*******************************************************
                   工具以及辅助方法
 ********************************************************/
-/*判断命令是否存在*/
+/*判断命令是否存在,并找到外部命令对应的可执行文件的目录,保存在cmdBuff中*/
 int exists(char *cmdFile){
     int i = 0;
     if((cmdFile[0] == '/' || cmdFile[0] == '.') && access(cmdFile, F_OK) == 0/*【文件是否存在，返回0存在，-1不存在】*/){ //命令在当前目录
@@ -155,7 +155,7 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
     
     free(now);
 }
-
+//暂停和终止都会产生SIGCHLD信号
 /*组合键命令ctrl+z*/
 void ctrl_Z(){
     Job *now = NULL;
@@ -195,7 +195,7 @@ void ctrl_C(){
         return;
     }
     
-    //SIGCHLD信号产生自ctrl+z
+    //SIGCHLD信号产生自ctrl+c
     ingnore = 1;
     
 	now = head;
@@ -224,6 +224,7 @@ void ctrl_C(){
 
 
 /*fg命令*/
+//命令格式为: fg %2705    数字是进程号
 void fg_exec(int pid){    
     Job *now = NULL; 
 	int i;
@@ -247,9 +248,6 @@ void fg_exec(int pid){
     
     signal(SIGTSTP, ctrl_Z); //设置signal信号，为下一次按下组合键Ctrl+Z做准备
     
-    //++++++
-    signal(SIGINT, ctrl_C); //设置signal信号，为下一次按下组合键Ctrl+C做准备
-    //++++++
     
     
     i = strlen(now->cmd) - 1;
@@ -555,8 +553,9 @@ void execOuterCmd(SimpleCmd *cmd){
                 printf("[%d]\t%s\t\t%s\n", getpid(), RUNNING, inputBuff);
                 kill(getppid(), SIGUSR1);
             }
-            
+            //去掉外部命令前"./"
             justArgs(cmd->args[0]);
+            //execv()通过目录cmdBuff找到名为cmd->args的可执行文件，并执行
             if(execv(cmdBuff, cmd->args) < 0){ //执行命令
                 printf("execv failed!\n");
                 return;
