@@ -187,7 +187,7 @@ void ctrl_Z(){
 }
 
 //++++++++++++++++++++++++++++++++++++++++++++
-/*组合键命令ctrl+z*/
+/*组合键命令ctrl+c*/
 void ctrl_C(){
     Job *now = NULL;
     
@@ -246,6 +246,12 @@ void fg_exec(int pid){
     strcpy(now->state, RUNNING);
     
     signal(SIGTSTP, ctrl_Z); //设置signal信号，为下一次按下组合键Ctrl+Z做准备
+    
+    //++++++
+    signal(SIGINT, ctrl_C); //设置signal信号，为下一次按下组合键Ctrl+C做准备
+    //++++++
+    
+    
     i = strlen(now->cmd) - 1;
     while(i >= 0 && now->cmd[i] != '&')
 		i--;
@@ -358,6 +364,10 @@ void init(){
     action.sa_flags = SA_SIGINFO;
     sigaction(SIGCHLD, &action, NULL);
     signal(SIGTSTP, ctrl_Z);
+    
+    //++++++
+    signal(SIGINT, ctrl_C); //设置signal信号，为下一次按下组合键Ctrl+C做准备
+    //++++++
 }
 
 /*******************************************************
