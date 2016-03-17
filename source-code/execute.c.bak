@@ -26,13 +26,13 @@ pid_t fgPid;                     //当前前台作业的进程号
 /*判断命令是否存在*/
 int exists(char *cmdFile){
     int i = 0;
-    if((cmdFile[0] == '/' || cmdFile[0] == '.') && access(cmdFile, F_OK) == 0){ //命令在当前目录
+    if((cmdFile[0] == '/' || cmdFile[0] == '.') && access(cmdFile, F_OK) == 0/*【文件是否存在，返回0存在，-1不存在】*/){ //命令在当前目录
         strcpy(cmdBuff, cmdFile);
         return 1;
     }else{  //查找ysh.conf文件中指定的目录，确定命令是否存在
         while(envPath[i] != NULL){ //查找路径已在初始化时设置在envPath[i]中
             strcpy(cmdBuff, envPath[i]);
-            strcat(cmdBuff, cmdFile);
+            strcat(cmdBuff, cmdFile);///【连接两个字符串】
             
             if(access(cmdBuff, F_OK) == 0){ //命令文件被找到
                 return 1;
@@ -45,7 +45,8 @@ int exists(char *cmdFile){
     return 0; 
 }
 
-/*将字符串转换为整型的Pid*/
+///【str[start...end]转化为int，如果有不属于0-9的字符则返回-1】
+/*将字符串转换为整型的Pid*/	
 int str2Pid(char *str, int start, int end){
     int i, j;
     char chs[20];
@@ -62,6 +63,7 @@ int str2Pid(char *str, int start, int end){
     return atoi(chs);
 }
 
+///【删除str这个字符串第一个'/'及之前的字符】
 /*调整部分外部命令的格式*/
 void justArgs(char *str){
     int i, j, len;
@@ -90,7 +92,7 @@ void setGoon(){
 void release(){
     int i;
     for(i = 0; strlen(envPath[i]) > 0; i++){
-        free(envPath[i]);
+        free(envPath[i]);	//【释放envPath[i]指向的内存空间】
     }
 }
 
@@ -98,7 +100,7 @@ void release(){
                   信号以及jobs相关
 ********************************************************/
 /*添加新的作业*/
-Job* addJob(pid_t pid){
+Job* addJob(pid_t pid){	//【pid_t就是int】
     Job *now = NULL, *last = NULL, *job = (Job*)malloc(sizeof(Job));
     
 	//初始化新的job
@@ -184,6 +186,43 @@ void ctrl_Z(){
     fgPid = 0;
 }
 
+//++++++++++++++++++++++++++++++++++++++++++++
+/*组合键命令ctrl+c*/
+void ctrl_C(){
+    Job *now = NULL;
+    
+    if(fgPid == 0){ //前台没有作业则直接返回
+        return;
+    }
+    
+    //SIGCHLD信号产生自ctrl+z
+    ingnore = 1;
+    
+	now = head;
+	while(now != NULL && now->pid != fgPid)
+		now = now->next;
+    
+    if(now == NULL){ //未找到前台作业，则根据fgPid添加前台作业
+        now = addJob(fgPid);
+    }
+    
+	//修改前台作业的状态及相应的命令格式，并打印提示信息
+    strcpy(now->state, STOPPED); 
+    now->cmd[strlen(now->cmd)] = '&';
+    now->cmd[strlen(now->cmd) + 1] = '\0';
+    printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
+    
+	//发送SIGSTOP信号给正在前台运作的工作，将其停止
+    kill(fgPid, SIGKILL);
+    fgPid = 0;
+}
+
+//++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
 /*fg命令*/
 void fg_exec(int pid){    
     Job *now = NULL; 
@@ -207,6 +246,12 @@ void fg_exec(int pid){
     strcpy(now->state, RUNNING);
     
     signal(SIGTSTP, ctrl_Z); //设置signal信号，为下一次按下组合键Ctrl+Z做准备
+    
+    //++++++
+    signal(SIGINT, ctrl_C); //设置signal信号，为下一次按下组合键Ctrl+C做准备
+    //++++++
+    
+    
     i = strlen(now->cmd) - 1;
     while(i >= 0 && now->cmd[i] != '&')
 		i--;
@@ -319,6 +364,10 @@ void init(){
     action.sa_flags = SA_SIGINFO;
     sigaction(SIGCHLD, &action, NULL);
     signal(SIGTSTP, ctrl_Z);
+    
+    //++++++
+    signal(SIGINT, ctrl_C); //设置signal信号，为下一次按下组合键Ctrl+C做准备
+    //++++++
 }
 
 /*******************************************************
@@ -608,16 +657,3 @@ void execute(){
     SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
     execSimpleCmd(cmd);
 }
-
-
-
-
-
-
-
-
-
-//test.c
-
-
-//gfdgfdgfd
