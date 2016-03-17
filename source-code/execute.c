@@ -207,7 +207,7 @@ void ctrl_C(){
     }
     
 	//修改前台作业的状态及相应的命令格式，并打印提示信息
-    strcpy(now->state, KILLED); 
+    strcpy(now->state, STOPPED); 
     now->cmd[strlen(now->cmd)] = '&';
     now->cmd[strlen(now->cmd) + 1] = '\0';
     printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
