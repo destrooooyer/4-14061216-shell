@@ -655,38 +655,59 @@ void execSimpleCmd(SimpleCmd *cmd){
 
 int exec_pipe(char *str)
 {
-	int i=0;
+	int i=0,j=0,n=0;
 	int flag=0;
+    char temp_chr_1st[100][100]={{0}};
 	
 	for(i=0;i<strlen(str);i++)
 	{
 		if(str[i]=='|')
 		{
 			flag=1;
-			break;
+            temp_chr_1st[n][j]='\0';
+            j=0;
+            n++;
 		}
+        else{
+            temp_chr_1st[n][j++]=str[i];
+        }
 	}
 	if(flag==0)
 		return 0;
 
-	char temp_chr_1st[100]={0};
-	char temp_chr_2nd[100]={0};
-	
-	int j;
-	for(j=0;j<i;j++)
-		temp_chr_1st[j]=str[j];
-	strcat(temp_chr_1st," > temp.txt");
-	
-	SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st, 0, strlen(temp_chr_1st));
-    execSimpleCmd(cmd);	
-	
-	for(j=0,i++;i<strlen(str);i++,j++)
-		temp_chr_2nd[j]=str[i];
-	strcat(temp_chr_2nd," < temp.txt");
-	
-	cmd = handleSimpleCmdStr(temp_chr_2nd, 0, strlen(temp_chr_2nd));
-    execSimpleCmd(cmd);
-	
+    for(i=0;i<=n;i++){
+        if(i == 0){
+            strcat(temp_chr_1st[i]," > temp1.txt");
+            SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st[i], 0, strlen(temp_chr_1st[i]));
+            execSimpleCmd(cmd); 
+        }
+        else if(i == n){
+            if(i%2 == 1){
+                strcat(temp_chr_1st[i]," < temp2.txt");
+                SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st[i], 0, strlen(temp_chr_1st[i]));
+                execSimpleCmd(cmd);
+            }
+            else{
+                strcat(temp_chr_1st[i]," < temp1.txt");
+                SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st[i], 0, strlen(temp_chr_1st[i]));
+                execSimpleCmd(cmd);
+            }
+        }
+        else{
+            if(i%2 == 1){
+                strcat(temp_chr_1st[i]," < temp2.txt");
+                strcat(temp_chr_1st[i]," > temp1.txt");
+                SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st[i], 0, strlen(temp_chr_1st[i]));
+                execSimpleCmd(cmd);
+            }
+            else{
+                strcat(temp_chr_1st[i]," < temp1.txt");
+                strcat(temp_chr_1st[i]," > temp2.txt");
+                SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st[i], 0, strlen(temp_chr_1st[i]));
+                execSimpleCmd(cmd);
+            }
+        }
+    }
 	return 1;
 	
 }
