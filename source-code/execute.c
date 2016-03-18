@@ -13,6 +13,7 @@
 #include <sys/termios.h>
 
 #include "global.h"
+
 #define DEBUG
 int goon = 0, ingnore = 0;       //用于设置signal信号量
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
@@ -368,11 +369,13 @@ void init(){
 /*******************************************************
                       命令解析
 ********************************************************/
-SimpleCmd* handleSimpleCmdStr(int begin, int end){
+SimpleCmd* handleSimpleCmdStr(char *_inputBuff, int begin, int end){
     int i, j, k;
     int fileFinished; //记录命令是否解析完毕
     char c, buff[10][40], inputFile[30], outputFile[30], *temp = NULL;
     SimpleCmd *cmd = (SimpleCmd*)malloc(sizeof(SimpleCmd));
+
+	//printf("%s|||",_inputBuff);
     
 	//默认为非后台命令，输入输出重定向为null
     cmd->isBack = 0;
@@ -387,7 +390,7 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
     
     i = begin;
 	//跳过空格等无用信息
-    while(i < end && (inputBuff[i] == ' ' || inputBuff[i] == '\t')){
+    while(i < end && (_inputBuff[i] == ' ' || _inputBuff[i] == '\t')){
         i++;
     }
     
@@ -395,13 +398,9 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
     j = 0;
     fileFinished = 0;
     temp = buff[k]; //以下通过temp指针的移动实现对buff[i]的顺次赋值过程
-    
-    int pipe_flag=0;
-    char pipe_next[50]={0};
-    
     while(i < end){
 		/*根据命令字符的不同情况进行不同的处理*/
-        switch(inputBuff[i]){ 
+        switch(_inputBuff[i]){ 
             case ' ':
             case '\t': //命令名及参数的结束标志
                 temp[j] = '\0';
@@ -441,38 +440,6 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
                 i++;
                 break;
                 
-            case '|': //管道
-            	
-            	pipe_flag=1;
-            		
-                if(j != 0){
-                    temp[j] = '\0';
-                    j = 0;
-                    if(!fileFinished){
-                        k++;
-                        temp = buff[k];
-                    }
-                }
-                temp = outputFile;
-                temp="temp.txt";
-                fileFinished = 1;
-                i++;
-                
-                int ii=0;
-                while(i<end)
-                {
-                	pipe_next[ii++]=inputBuff[i];
-                }
-               	
-               	char temp_str[30]=" < temp.txt"
-               	
-               	for(jj=0;jj<11;jj++)
-               	{
-               		pipe_next[ii++]=temp_str[jj];
-               	}
-                
-                break;
-                
             case '&': //后台运行标志
                 if(j != 0){
                     temp[j] = '\0';
@@ -488,71 +455,57 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
                 break;
                 
             default: //默认则读入到temp指定的空间
-                temp[j++] = inputBuff[i++];
+                temp[j++] = _inputBuff[i++];
                 continue;
 		}
         
 		//跳过空格等无用信息
-        while(i < end && (inputBuff[i] == ' ' || inputBuff[i] == '\t')){
+        while(i < end && (_inputBuff[i] == ' ' || _inputBuff[i] == '\t')){
             i++;
         }
-	
-}
-	
-		
+	}
     
-	if(inputBuff[end-1] != ' ' && inputBuff[end-1] != '\t' && inputBuff[end-1] != '&'){
-	    temp[j] = '\0';
-	    if(!fileFinished){
-	        k++;
-	    }
-	}
-	   
+    if(_inputBuff[end-1] != ' ' && _inputBuff[end-1] != '\t' && _inputBuff[end-1] != '&'){
+        temp[j] = '\0';
+        if(!fileFinished){
+            k++;
+        }
+    }
+    
 	//依次为命令名及其各个参数赋值
-	cmd->args = (char**)malloc(sizeof(char*) * (k + 1));
-	cmd->args[k] = NULL;
-	for(i = 0; i<k; i++){
-	    j = strlen(buff[i]);
-	    cmd->args[i] = (char*)malloc(sizeof(char) * (j + 1));   
-	    strcpy(cmd->args[i], buff[i]);
-	}
-	
+    cmd->args = (char**)malloc(sizeof(char*) * (k + 1));
+    cmd->args[k] = NULL;
+    for(i = 0; i<k; i++){
+        j = strlen(buff[i]);
+        cmd->args[i] = (char*)malloc(sizeof(char) * (j + 1));   
+        strcpy(cmd->args[i], buff[i]);
+    }
+    
 	//如果有输入重定向文件，则为命令的输入重定向变量赋值
-	if(strlen(inputFile) != 0){
-	    j = strlen(inputFile);
-	    cmd->input = (char*)malloc(sizeof(char) * (j + 1));
-	    strcpy(cmd->input, inputFile);
-	}
-	
-	//如果有输出重定向文件，则为命令的输出重定向变量赋值
-	if(strlen(outputFile) != 0){
-	    j = strlen(outputFile);
-	    cmd->output = (char*)malloc(sizeof(char) * (j + 1));   
-	    strcpy(cmd->output, outputFile);
-	}
-	#ifdef DEBUG
-	printf("****\n");
-	printf("isBack: %d\n",cmd->isBack);
-		for(i = 0; cmd->args[i] != NULL; i++){
-			printf("args[%d]: %s\n",i,cmd->args[i]);
-		}
-	printf("input: %s\n",cmd->input);
-	printf("output: %s\n",cmd->output);
-	printf("****\n");
-	#endif
-	    
-	execSimpleCmd(cmd);
-	if(pipe_flag==0)
-	{
-	    return cmd;
-	}
-	else 
-	{
-		handleSimpleCmdStr(pipe_next,0,strlen(pipe_next));
-		return cmd;
-	}
-}
+    if(strlen(inputFile) != 0){
+        j = strlen(inputFile);
+        cmd->input = (char*)malloc(sizeof(char) * (j + 1));
+        strcpy(cmd->input, inputFile);
+    }
 
+    //如果有输出重定向文件，则为命令的输出重定向变量赋值
+    if(strlen(outputFile) != 0){
+        j = strlen(outputFile);
+        cmd->output = (char*)malloc(sizeof(char) * (j + 1));   
+        strcpy(cmd->output, outputFile);
+    }
+    #ifdef DEBUG
+    printf("****\n");
+    printf("isBack: %d\n",cmd->isBack);
+    	for(i = 0; cmd->args[i] != NULL; i++){
+    		printf("args[%d]: %s\n",i,cmd->args[i]);
+	}
+    printf("input: %s\n",cmd->input);
+    printf("output: %s\n",cmd->output);
+    printf("****\n");
+    #endif
+    return cmd;
+}
 
 /*******************************************************
                       命令执行
@@ -695,10 +648,53 @@ void execSimpleCmd(SimpleCmd *cmd){
     }
 }
 
+
+int exec_pipe(char *str)
+{
+	int i=0;
+	int flag=0;
+	
+	for(i=0;i<strlen(str);i++)
+	{
+		if(str[i]=='|')
+		{
+			flag=1;
+			break;
+		}
+	}
+	if(flag==0)
+		return 0;
+
+	char temp_chr_1st[100]={0};
+	char temp_chr_2nd[100]={0};
+	
+	int j;
+	for(j=0;j<i;j++)
+		temp_chr_1st[j]=str[j];
+	strcat(temp_chr_1st," > temp.txt");
+	
+	SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st, 0, strlen(temp_chr_1st));
+    execSimpleCmd(cmd);	
+	
+	for(j=0,i++;i<strlen(str);i++,j++)
+		temp_chr_2nd[j]=str[i];
+	strcat(temp_chr_2nd," < temp.txt");
+	
+	cmd = handleSimpleCmdStr(temp_chr_2nd, 0, strlen(temp_chr_2nd));
+    execSimpleCmd(cmd);
+	
+	return 1;
+	
+}
+
+
 /*******************************************************
                      命令执行接口
 ********************************************************/
 void execute(){
-    SimpleCmd *cmd = handleSimpleCmdStr(0, strlen(inputBuff));
-    //execSimpleCmd(cmd);
+	if(exec_pipe(inputBuff)==0)
+	{
+    	SimpleCmd *cmd = handleSimpleCmdStr(inputBuff, 0, strlen(inputBuff));
+    	execSimpleCmd(cmd);
+	}
 }

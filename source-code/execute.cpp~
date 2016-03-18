@@ -247,11 +247,6 @@ void fg_exec(int pid){
     
     signal(SIGTSTP, ctrl_Z); //设置signal信号，为下一次按下组合键Ctrl+Z做准备
     
-    //++++++
-    signal(SIGINT, ctrl_C); //设置signal信号，为下一次按下组合键Ctrl+C做准备
-    //++++++
-    
-    
     i = strlen(now->cmd) - 1;
     while(i >= 0 && now->cmd[i] != '&')
 		i--;
@@ -366,14 +361,14 @@ void init(){
     signal(SIGTSTP, ctrl_Z);
     
     //++++++
-    signal(SIGINT, ctrl_C); //设置signal信号，为下一次按下组合键Ctrl+C做准备
+    signal(SIGINT, ctrl_C);
     //++++++
 }
 
 /*******************************************************
                       命令解析
 ********************************************************/
-SimpleCmd* handleSimpleCmdStr(int begin, int end){
+SimpleCmd* handleSimpleCmdStr(string _inputBuff, int begin, int end){
     int i, j, k;
     int fileFinished; //记录命令是否解析完毕
     char c, buff[10][40], inputFile[30], outputFile[30], *temp = NULL;
@@ -392,7 +387,7 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
     
     i = begin;
 	//跳过空格等无用信息
-    while(i < end && (inputBuff[i] == ' ' || inputBuff[i] == '\t')){
+    while(i < end && (_inputBuff[i] == ' ' || _inputBuff[i] == '\t')){
         i++;
     }
     
@@ -402,7 +397,7 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
     temp = buff[k]; //以下通过temp指针的移动实现对buff[i]的顺次赋值过程
     while(i < end){
 		/*根据命令字符的不同情况进行不同的处理*/
-        switch(inputBuff[i]){ 
+        switch(_inputBuff[i]){ 
             case ' ':
             case '\t': //命令名及参数的结束标志
                 temp[j] = '\0';
@@ -457,17 +452,17 @@ SimpleCmd* handleSimpleCmdStr(int begin, int end){
                 break;
                 
             default: //默认则读入到temp指定的空间
-                temp[j++] = inputBuff[i++];
+                temp[j++] = _inputBuff[i++];
                 continue;
 		}
         
 		//跳过空格等无用信息
-        while(i < end && (inputBuff[i] == ' ' || inputBuff[i] == '\t')){
+        while(i < end && (_inputBuff[i] == ' ' || _inputBuff[i] == '\t')){
             i++;
         }
 	}
     
-    if(inputBuff[end-1] != ' ' && inputBuff[end-1] != '\t' && inputBuff[end-1] != '&'){
+    if(_inputBuff[end-1] != ' ' && _inputBuff[end-1] != '\t' && _inputBuff[end-1] != '&'){
         temp[j] = '\0';
         if(!fileFinished){
             k++;
