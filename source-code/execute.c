@@ -1,3 +1,8 @@
+/*
+1.添加了几个不支持参数的简单内部命令
+2.修改了CTRL+C 没有彻底删除进程，还残留在jobs中的错误。jobs只保存没有执行完的作业
+3.修改了fg命令重启的进程无法再被Ctrl Z/C中断的错误
+*/
 #include <string.h>
 #include <ctype.h>
 #include <unistd.h>
@@ -20,6 +25,8 @@ char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
 Job *head = NULL;                //作业头指针
 pid_t fgPid;                     //当前前台作业的进程号
+
+int ifCtrl = 0;
 
 /*******************************************************
                   工具以及辅助方法
@@ -160,10 +167,15 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
 /*组合键命令ctrl+z*/
 void ctrl_Z(){
     Job *now = NULL;
+
+    ifCtrl = 1;
     
-    if(fgPid == 0){ //前台没有作业则直接返回
-        return;
-    }
+    printf("zfgPid=%d\n", fgPid);
+
+     if(fgPid == 0){ //前台没有作业则直接返回
+        ingnore = 1;
+        return;   //return 产生的信号会被init()里面声明的signal()捕捉，所以产生了错误
+     }
     
     //SIGCHLD信号产生自ctrl+z
     ingnore = 1;
@@ -183,6 +195,7 @@ void ctrl_Z(){
     printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
     
     //发送SIGSTOP信号给正在前台运作的工作，将其停止
+    printf("z\n");
     kill(fgPid, SIGSTOP);
     fgPid = 0;
 }
@@ -191,6 +204,8 @@ void ctrl_Z(){
 /*组合键命令ctrl+c*/
 void ctrl_C(){
     Job *now = NULL;
+
+    ifCtrl = 1;
     
     if(fgPid == 0){ //前台没有作业则直接返回
         return;
@@ -200,19 +215,20 @@ void ctrl_C(){
     ingnore = 1;
     
     now = head;
-    while(now != NULL && now->pid != fgPid)
+    printf("%d\n", fgPid);
+
+    /*****************************************************/
+    if(now != NULL && now->pid == fgPid){
         now = now->next;
-    
-    if(now == NULL){ //未找到前台作业，则根据fgPid添加前台作业
-        now = addJob(fgPid);
     }
-    
-    //修改前台作业的状态及相应的命令格式，并打印提示信息
-    strcpy(now->state, KILLED); 
-    now->cmd[strlen(now->cmd)] = '&';
-    now->cmd[strlen(now->cmd) + 1] = '\0';
-    printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
-    
+    while(now != NULL && now->next !=NULL && now->next->pid != fgPid )
+        now = now->next;
+    if(now != NULL && now->next !=NULL && now->next->pid == fgPid){
+        now->next = now->next->next;
+    }
+    printf("[%d]\t%s\t\t%s\n", fgPid, KILLED, inputBuff);
+    /*****************************************************/
+
     //发送SIGSTOP信号给正在前台运作的工作，将其停止
     kill(fgPid, SIGKILL);
     fgPid = 0;
@@ -247,7 +263,8 @@ void fg_exec(int pid){
     strcpy(now->state, RUNNING);
     
     signal(SIGTSTP, ctrl_Z); //设置signal信号，为下一次按下组合键Ctrl+Z做准备
-    
+    ifCtrl = 0;
+
     i = strlen(now->cmd) - 1;
     while(i >= 0 && now->cmd[i] != '&')
         i--;
@@ -258,7 +275,7 @@ void fg_exec(int pid){
     printf("%d\n",fgPid);
     //waitpid(fgPid, NULL, 0); //父进程等待前台进程的运行
     /***************************************************/
-    while(waitpid(fgPid, NULL, 0)!= fgPid) ;
+    while(waitpid(fgPid, NULL, 0)!= fgPid && ifCtrl ==0) ;
     /***************************************************/
 }
 
@@ -412,6 +429,7 @@ SimpleCmd* handleSimpleCmdStr(char *_inputBuff, int begin, int end){
     while(i < end){
         /*根据命令字符的不同情况进行不同的处理*/
         switch(_inputBuff[i]){ 
+            //遇到空格开始读参数
             case ' ':
             case '\t': //命令名及参数的结束标志
                 temp[j] = '\0';
@@ -527,7 +545,6 @@ void execOuterCmd(SimpleCmd *cmd){
     int pipeIn, pipeOut;
     
     if(exists(cmd->args[0])){ //命令存在
-
         if((pid = fork()) < 0){
             perror("fork failed");
             return;
@@ -563,11 +580,9 @@ void execOuterCmd(SimpleCmd *cmd){
                 
                 printf("[%d]\t%s\t\t%s\n", getpid(), RUNNING, inputBuff);
                 kill(getppid(), SIGUSR1);
-                printf("1\n");
             }
             
             justArgs(cmd->args[0]);
-            printf("2\n");
             if(execv(cmdBuff, cmd->args) < 0){ //执行命令
                 printf("execv failed!\n");
                 return;
@@ -583,6 +598,7 @@ void execOuterCmd(SimpleCmd *cmd){
                 signal(SIGUSR1, setGoon);
                 while(goon == 0) ;
                 goon = 0;
+
                 /************************/
                 waitpid(pid, NULL, 0);
                 /***********************/
@@ -598,10 +614,13 @@ void execOuterCmd(SimpleCmd *cmd){
 
 /*执行命令*/
 void execSimpleCmd(SimpleCmd *cmd){
-    int i, pid;
+    int i, pid, len, j, k=0;
     char *temp;
+    char address[100] ,c;
     Job *now = NULL;
+    char *internalcommand[]={"cd","exit","fg","bg","history","jobs","kill","echo","pwd","type","read","break","continue","export","return","shift","test","exec","eval","hash","readonly","trap","unset","umask","wait"};
     
+
     if(strcmp(cmd->args[0], "exit") == 0) { //exit命令
         exit(0);
     } else if (strcmp(cmd->args[0], "history") == 0) { //history命令
@@ -626,8 +645,9 @@ void execSimpleCmd(SimpleCmd *cmd){
     } else if (strcmp(cmd->args[0], "cd") == 0) { //cd命令
         temp = cmd->args[1];
         if(temp != NULL){
+            //chdir()函数，改变当前目录
             if(chdir(temp) < 0){
-                printf("cd; %s 错误的文件名或文件夹名！\n", temp);
+                printf("cd; %s Incorrect file name or folder name！\n", temp);
             }
         }
     } else if (strcmp(cmd->args[0], "fg") == 0) { //fg命令
@@ -638,7 +658,7 @@ void execSimpleCmd(SimpleCmd *cmd){
                 fg_exec(pid);
             }
         }else{
-            printf("fg; 参数不合法，正确格式为：fg %<int>\n");
+            printf("fg; Parameters not lawful,the correct format is：fg %<int>\n");
         }
     } else if (strcmp(cmd->args[0], "bg") == 0) { //bg命令
         temp = cmd->args[1];
@@ -650,9 +670,56 @@ void execSimpleCmd(SimpleCmd *cmd){
             }
         }
         else{
-            printf("bg; 参数不合法，正确格式为：bg %<int>\n");
+            printf("bg; Parameters not lawful,the correct format is：bg %<int>\n");
         }
-    } else{ //外部命令
+    }
+    /*********************************************************/
+    else if (strcmp(cmd->args[0], "echo") == 0) { //echo命令
+        temp = cmd->args[1];
+        len = strlen(temp);
+        if(temp != NULL && temp[0] == '"' && temp[len-1] == '"' ){
+            for(i=1;i<len-1;i++){
+                printf("%c", temp[i]);
+            }
+            printf("\n");
+        }
+        else{
+            printf("echo; Parameters not lawful,the correct format is：echo \"...\"\n");
+        } 
+    }
+    else if(strcmp(cmd->args[0], "pwd") == 0){ //pwd命令
+        if(getcwd(address,sizeof(address)) != NULL){
+            printf("current working directory: %s\n", address);
+        }
+        else{
+            printf("fales to get current working directory\n");
+        }
+    }
+    else if(strcmp(cmd->args[0], "kill") == 0){ //kill命令
+        temp = cmd->args[1];
+        pid = atoi(temp);
+        if(kill(pid,SIGKILL) < 0){
+            printf("false to kill %d\n", pid);
+        }
+
+    }
+    else if(strcmp(cmd->args[0], "type") == 0){
+        for(i=1;cmd->args[i]!=NULL;i++){
+            temp = cmd->args[i];
+            for(j=0;internalcommand[j]!=NULL;j++){
+                if( (strcmp(temp,internalcommand[j])) == 0 ){
+                    k=1;
+                    printf("%s is a shell builtin\n", cmd->args[i]);
+                    break;
+                }
+            }
+            if(k == 0){
+                printf("%s is in /bin/%s\n", cmd->args[i],cmd->args[i]);
+            }
+            k=0;
+        }
+    }
+    else{ //外部命令
         execOuterCmd(cmd);
     }
     
