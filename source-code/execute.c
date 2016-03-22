@@ -589,10 +589,16 @@ void execOuterCmd(SimpleCmd *cmd){
 				kill(getppid(), SIGUSR1);
 			}
 
+			///如果路径是"./"sh会傻了吧唧的把它当成/bin(我猜的)，然后就扯了，所以不调用sh+++++++++++++++++
+			int flag_is_usrprog = 0;
+			if (cmd->args[0][0] == '.'&&cmd->args[0][1] == '/')
+				flag_is_usrprog = 1;
+			//++++++++++++++++++++++++++++++
+
 			justArgs(cmd->args[0]);
 
 			//++++++++++++++++++++++++++
-			
+
 			int k;
 			int len = 0;
 			for (k = 0; cmd->args[k] != NULL; k++)
@@ -614,17 +620,31 @@ void execOuterCmd(SimpleCmd *cmd){
 				strcat(inst[2], "  ");
 			}
 			//printf("%s\n",inst[2]);
-			if (execv("/bin/sh", inst) < 0){ //执行命令
-				printf("execv failed!\n");
-				return;
+
+
+			if (flag_is_usrprog == 1)
+			{
+				if (execv(cmdBuff, cmd->args) < 0)
+				{ //执行命令
+					printf("execv failed!\n");
+					return;
+				}
 			}
-			
+			else
+			{
+				if (execv("/bin/sh", inst) < 0)
+				{ //执行命令
+					printf("execv failed!\n");
+					return;
+				}
+			}
+
 			//++++++++++++++++++++++++++
 
-// 			if (execv(cmdBuff, cmd->args) < 0){ //执行命令
-// 				printf("execv failed!\n");
-// 				return;
-// 			}
+			// 			if (execv(cmdBuff, cmd->args) < 0){ //执行命令
+			// 				printf("execv failed!\n");
+			// 				return;
+			// 			}
 		}
 		else{ //父进程
 			if (cmd->isBack){ //后台命令             
@@ -794,41 +814,50 @@ int exec_pipe(char *str)
 			j = 0;
 			n++;
 		}
-		else{
+		else
+		{
 			temp_chr_1st[n][j++] = str[i];
 		}
 	}
 	if (flag == 0)
 		return 0;
 
-	for (i = 0; i <= n; i++){
-		if (i == 0){
+	for (i = 0; i <= n; i++)
+	{
+		if (i == 0)
+		{
 			strcat(temp_chr_1st[i], " > temp1.txt");
 			SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st[i], 0, strlen(temp_chr_1st[i]));
 			execSimpleCmd(cmd);
 		}
-		else if (i == n){
-			if (i % 2 == 1){
-				strcat(temp_chr_1st[i], " < temp2.txt");
+		else if (i == n)
+		{
+			if (i % 2 == 1)
+			{
+				strcat(temp_chr_1st[i], " < temp1.txt");
 				SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st[i], 0, strlen(temp_chr_1st[i]));
 				execSimpleCmd(cmd);
 			}
-			else{
-				strcat(temp_chr_1st[i], " < temp1.txt");
+			else
+			{
+				strcat(temp_chr_1st[i], " < temp2.txt");
 				SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st[i], 0, strlen(temp_chr_1st[i]));
 				execSimpleCmd(cmd);
 			}
 		}
-		else{
-			if (i % 2 == 1){
-				strcat(temp_chr_1st[i], " < temp2.txt");
-				strcat(temp_chr_1st[i], " > temp1.txt");
+		else
+		{
+			if (i % 2 == 1)
+			{
+				strcat(temp_chr_1st[i], " < temp1.txt");
+				strcat(temp_chr_1st[i], " > temp2.txt");
 				SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st[i], 0, strlen(temp_chr_1st[i]));
 				execSimpleCmd(cmd);
 			}
-			else{
-				strcat(temp_chr_1st[i], " < temp1.txt");
-				strcat(temp_chr_1st[i], " > temp2.txt");
+			else
+			{
+				strcat(temp_chr_1st[i], " < temp2.txt");
+				strcat(temp_chr_1st[i], " > temp1.txt");
 				SimpleCmd *cmd = handleSimpleCmdStr(temp_chr_1st[i], 0, strlen(temp_chr_1st[i]));
 				execSimpleCmd(cmd);
 			}
