@@ -20,6 +20,12 @@
 #include "global.h"
 
 #define DEBUG
+
+int flag_ctrl_z = -1;
+pid_t p_pid = -1;
+pid_t fg_gid0 = -1;
+int _sync_gc = -1;
+
 int goon = 0, ingnore = 0;       //用于设置signal信号量
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
 History history;                 //历史命令
@@ -170,15 +176,14 @@ void rmJob(int sig, siginfo_t *sip, void* noused){
 
 /*组合键命令ctrl+z*/
 void ctrl_Z(){
+	if (flag_ctrl_z == 1) return;
 	Job *now = NULL;
 
 	ifCtrl = 1;
 
-	printf("zfgPid=%d\n", fgPid);
-
 	if (fgPid == 0){ //前台没有作业则直接返回
 		ingnore = 1;
-		return;   //return 产生的信号会被init()里面声明的signal()捕捉，所以产生了错误
+		return;   //return 产生的信号会被()里面声明的signal()捕捉，所以产生了错误
 	}
 
 	//SIGCHLD信号产生自ctrl+z
@@ -199,9 +204,22 @@ void ctrl_Z(){
 	printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
 
 	//发送SIGSTOP信号给正在前台运作的工作，将其停止
-	printf("z\n");
 	kill(fgPid, SIGSTOP);
 	fgPid = 0;
+}
+
+void _sync()
+{
+	_sync_gc = 1;
+}
+
+void tell_grandpa()
+{
+	usleep(300000);
+// 	while (_sync_gc != 1)
+// 		usleep(1000);
+	kill(p_pid, SIGTSTP);
+	_sync_gc = -1;
 }
 
 //++++++++++++++++++++++++++++++++++++++++++++
@@ -248,6 +266,9 @@ void ctrl_C(){
 void fg_exec(int pid){
 	Job *now = NULL;
 	int i;
+	/***************/
+	tcsetpgrp(0, pid);
+	/***************/
 
 	//SIGCHLD信号产生自此函数
 	ingnore = 1;
@@ -279,8 +300,15 @@ void fg_exec(int pid){
 	printf("%d\n", fgPid);
 	//waitpid(fgPid, NULL, 0); //父进程等待前台进程的运行
 	/***************************************************/
-	while (waitpid(fgPid, NULL, 0) != fgPid && ifCtrl == 0);
+	waitpid(fgPid, NULL, WUNTRACED);
+	// 	while (waitpid(fgPid, NULL, 0) != fgPid && ifCtrl == 0)
+	// 	{
+	// 		printf("sdfff\n");
+	// 		sleep(1);
+	// 	}
+	tcsetpgrp(0, fg_gid0);
 	/***************************************************/
+
 }
 
 /*bg命令*/
@@ -302,7 +330,7 @@ void bg_exec(int pid){
 	/************************************/
 	signal(SIGTSTP, ctrl_Z);
 	/************************************/
-
+	//printf("%d\n", setpgid(now->pid, getpid()));
 	strcpy(now->state, RUNNING); //修改对象作业的状态
 	printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
 
@@ -357,14 +385,19 @@ void getEnvPath(int len, char *buf){
 	envPath[pathIndex] = NULL;
 }
 
+
 /*初始化操作*/
 void init(){
+	//获取前台进程组号
+
+	fg_gid0 = tcgetpgrp(0);
+
 	int fd, n, len;
 	char c, buf[80];
 
 	//打开查找路径文件ysh.conf
 	if ((fd = open("ysh.conf", O_RDONLY, 660)) == -1){
-		perror("init environment failed\n");
+		perror(" environment failed\n");
 		exit(1);
 	}
 
@@ -397,7 +430,11 @@ void init(){
 	/*******************************************************/
 	signal(SIGUSR1, setGoon); //不注册的话无法在进程间通信，会卡死在进程里
 	/*******************************************************/
+	signal(SIGTTOU, SIG_IGN);
+
+
 }
+
 
 /*******************************************************
 					  命令解析
@@ -587,11 +624,17 @@ void execOuterCmd(SimpleCmd *cmd){
 
 				printf("[%d]\t%s\t\t%s\n", getpid(), RUNNING, inputBuff);
 				kill(getppid(), SIGUSR1);
-				if(setpgid(0,getpid())<0){
-                    printf("false to build process group\n");
-                }
-                /****************************************************/
+
+				/****************************************************/
 			}
+
+			//	if (setpgid(0, getpid()) < 0)	//把自己扔到新进程组
+			//	{
+			//		printf("failed to build process group\n");
+			//	}
+
+
+
 
 			///如果路径是"./"sh会傻了吧唧的把它当成/bin(我猜的)，然后就扯了，所以不调用sh+++++++++++++++++
 			int flag_is_usrprog = 0;
@@ -600,7 +643,7 @@ void execOuterCmd(SimpleCmd *cmd){
 			//++++++++++++++++++++++++++++++
 
 			justArgs(cmd->args[0]);
-			
+
 			//++++++++++++++++++++++++++
 
 			int k;
@@ -624,34 +667,41 @@ void execOuterCmd(SimpleCmd *cmd){
 				strcat(inst[2], "  ");
 			}
 			//printf("%s\n",inst[2]);
+			p_pid = getppid();
+			pid_t _pid = fork();
 
-
-			if (flag_is_usrprog == 1)
+			if (_pid == 0)	//子进程的子进程
 			{
-				if (execv(cmdBuff, cmd->args) < 0)
-				{ //执行命令
-					printf("execv failed!\n");
-					return;
-				}
+				flag_ctrl_z = 1;
+				signal(SIGTSTP, tell_grandpa);
+				//signal(SIGUSR2, _sync);
+				while (waitpid(getppid(), NULL, 0) != getppid());
+				return;
 			}
 			else
 			{
-				if (execv("/bin/sh", inst) < 0)
-				{ //执行命令
-					printf("execv failed!\n");
-					return;
+
+				if (flag_is_usrprog == 1)
+				{
+					if (execv(cmdBuff, cmd->args) < 0)
+					{ //执行命令
+						printf("execv failed!\n");
+						return;
+					}
+				}
+				else
+				{
+					if (execv("/bin/sh", inst) < 0)
+					{ //执行命令
+						printf("execv failed!\n");
+						return;
+					}
 				}
 			}
-
-			//++++++++++++++++++++++++++
-
-			// 			if (execv(cmdBuff, cmd->args) < 0){ //执行命令
-			// 				printf("execv failed!\n");
-			// 				return;
-			// 			}
 		}
 		else{ //父进程
-			if (cmd->isBack){ //后台命令             
+			if (cmd->isBack)
+			{ //后台命令             
 				fgPid = 0; //pid置0，为下一命令做准备
 				addJob(pid); //增加新的作业
 				kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
@@ -662,12 +712,26 @@ void execOuterCmd(SimpleCmd *cmd){
 				goon = 0;
 
 				/************************/
-				waitpid(pid, NULL, 0);
+				//waitpid(pid, NULL, 0);
 				/***********************/
+
 			}
-			else{ //非后台命令
+			else
+			{ //非后台命令
 				fgPid = pid;
-				waitpid(pid, NULL, 0);
+				tcsetpgrp(0, pid);  //把终端控制权交给子进程
+				printf("%d\n", setpgid(pid, pid));
+				//printf("%d\n",setpgid(getpid(), pid));
+				printf("%d\n", errno);
+				waitpid(pid, NULL, WUNTRACED);  //等待子进程结束    
+				printf("asdf\n");
+
+
+
+				tcsetpgrp(0, fg_gid0);   //拿回终端控制权
+
+
+
 			}
 		}
 	}
@@ -725,6 +789,7 @@ void execSimpleCmd(SimpleCmd *cmd){
 			pid = str2Pid(temp, 1, strlen(temp));
 			if (pid != -1){
 				fg_exec(pid);
+				printf("\n");
 			}
 		}
 		else{
@@ -763,14 +828,14 @@ void execSimpleCmd(SimpleCmd *cmd){
 			printf("current working directory: %s\n", address);
 		}
 		else{
-			printf("fales to get current working directory\n");
+			printf("failed to get current working directory\n");
 		}
 	}
 	else if (strcmp(cmd->args[0], "kill") == 0){ //kill命令
 		temp = cmd->args[1];
 		pid = atoi(temp);
 		if (kill(pid, SIGKILL) < 0){
-			printf("false to kill %d\n", pid);
+			printf("failed to kill %d\n", pid);
 		}
 
 	}
