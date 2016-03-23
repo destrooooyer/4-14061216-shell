@@ -587,6 +587,10 @@ void execOuterCmd(SimpleCmd *cmd){
 
 				printf("[%d]\t%s\t\t%s\n", getpid(), RUNNING, inputBuff);
 				kill(getppid(), SIGUSR1);
+				if(setpgid(0,getpid())<0){
+                    printf("false to build process group\n");
+                }
+                /****************************************************/
 			}
 
 			///如果路径是"./"sh会傻了吧唧的把它当成/bin(我猜的)，然后就扯了，所以不调用sh+++++++++++++++++
@@ -596,7 +600,7 @@ void execOuterCmd(SimpleCmd *cmd){
 			//++++++++++++++++++++++++++++++
 
 			justArgs(cmd->args[0]);
-
+			
 			//++++++++++++++++++++++++++
 
 			int k;
