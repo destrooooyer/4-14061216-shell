@@ -24,7 +24,6 @@
 int flag_ctrl_z = -1;
 pid_t p_pid = -1;
 pid_t fg_gid0 = -1;
-int _sync_gc = -1;
 
 int goon = 0, ingnore = 0;       //用于设置signal信号量
 char *envPath[10], cmdBuff[40];  //外部命令的存放路径及读取外部命令的缓冲空间
@@ -208,18 +207,11 @@ void ctrl_Z(){
 	fgPid = 0;
 }
 
-void _sync()
-{
-	_sync_gc = 1;
-}
 
 void tell_grandpa()
 {
 	usleep(300000);
-// 	while (_sync_gc != 1)
-// 		usleep(1000);
 	kill(p_pid, SIGTSTP);
-	_sync_gc = -1;
 }
 
 //++++++++++++++++++++++++++++++++++++++++++++
@@ -232,13 +224,9 @@ void ctrl_C(){
 	if (fgPid == 0){ //前台没有作业则直接返回
 		return;
 	}
-
 	//SIGCHLD信号产生自ctrl+c
 	ingnore = 1;
-
 	now = head;
-	printf("%d\n", fgPid);
-
 	/*****************************************************/
 	if (now != NULL && now->pid == fgPid){
 		now = now->next;
@@ -250,7 +238,6 @@ void ctrl_C(){
 	}
 	printf("[%d]\t%s\t\t%s\n", fgPid, KILLED, inputBuff);
 	/*****************************************************/
-
 	//发送SIGSTOP信号给正在前台运作的工作，将其停止
 	kill(fgPid, SIGKILL);
 	fgPid = 0;
@@ -300,12 +287,7 @@ void fg_exec(int pid){
 	printf("%d\n", fgPid);
 	//waitpid(fgPid, NULL, 0); //父进程等待前台进程的运行
 	/***************************************************/
-	waitpid(fgPid, NULL, WUNTRACED);
-	// 	while (waitpid(fgPid, NULL, 0) != fgPid && ifCtrl == 0)
-	// 	{
-	// 		printf("sdfff\n");
-	// 		sleep(1);
-	// 	}
+	while(waitpid(fgPid, NULL, WUNTRACED)<0);
 	tcsetpgrp(0, fg_gid0);
 	/***************************************************/
 
@@ -330,7 +312,6 @@ void bg_exec(int pid){
 	/************************************/
 	signal(SIGTSTP, ctrl_Z);
 	/************************************/
-	//printf("%d\n", setpgid(now->pid, getpid()));
 	strcpy(now->state, RUNNING); //修改对象作业的状态
 	printf("[%d]\t%s\t\t%s\n", now->pid, now->state, now->cmd);
 
@@ -628,10 +609,10 @@ void execOuterCmd(SimpleCmd *cmd){
 				/****************************************************/
 			}
 
-			//	if (setpgid(0, getpid()) < 0)	//把自己扔到新进程组
-			//	{
-			//		printf("failed to build process group\n");
-			//	}
+			if (setpgid(0, getpid()) < 0)	//把自己扔到新进程组
+			{
+				printf("failed to build process group\n");
+			}
 
 
 
@@ -641,9 +622,7 @@ void execOuterCmd(SimpleCmd *cmd){
 			if (cmd->args[0][0] == '.'&&cmd->args[0][1] == '/')
 				flag_is_usrprog = 1;
 			//++++++++++++++++++++++++++++++
-
 			justArgs(cmd->args[0]);
-
 			//++++++++++++++++++++++++++
 
 			int k;
@@ -666,15 +645,14 @@ void execOuterCmd(SimpleCmd *cmd){
 				strcat(inst[2], cmd->args[i]);
 				strcat(inst[2], "  ");
 			}
-			//printf("%s\n",inst[2]);
+
+
 			p_pid = getppid();
 			pid_t _pid = fork();
-
 			if (_pid == 0)	//子进程的子进程
 			{
 				flag_ctrl_z = 1;
 				signal(SIGTSTP, tell_grandpa);
-				//signal(SIGUSR2, _sync);
 				while (waitpid(getppid(), NULL, 0) != getppid());
 				return;
 			}
@@ -711,23 +689,14 @@ void execOuterCmd(SimpleCmd *cmd){
 				while (goon == 0);
 				goon = 0;
 
-				/************************/
-				//waitpid(pid, NULL, 0);
-				/***********************/
-
 			}
 			else
 			{ //非后台命令
 				fgPid = pid;
 				tcsetpgrp(0, pid);  //把终端控制权交给子进程
-				printf("%d\n", setpgid(pid, pid));
-				//printf("%d\n",setpgid(getpid(), pid));
-				printf("%d\n", errno);
+				//printf("%d\n", setpgid(pid, pid));
 				waitpid(pid, NULL, WUNTRACED);  //等待子进程结束    
-				printf("asdf\n");
-
-
-
+				usleep(500000);
 				tcsetpgrp(0, fg_gid0);   //拿回终端控制权
 
 
