@@ -1,6 +1,6 @@
 #ifndef _global_H
 #define _global_H
-//标志下面的代码是cpp代码，用C的方式去翻译链接
+//卤锚脰戮脧脗脙忙碌脛麓煤脗毛脢脟cpp麓煤脗毛拢卢脫脙C碌脛路陆脢陆脠楼路颅脪毛脕麓陆脫
 #ifdef	__cplusplus
 extern "C" {
 #endif   
@@ -20,26 +20,26 @@ extern "C" {
     #include <stdlib.h>
     
     typedef struct SimpleCmd {
-        int isBack;     // 是否后台运行
-        char **args;    // 命令及参数
-        char *input;    // 输入重定向
-        char *output;   // 输出重定向
+        int isBack;     // 脢脟路帽潞贸脤篓脭脣脨脨
+        char **args;    // 脙眉脕卯录掳虏脦脢媒
+        char *input;    // 脢盲脠毛脰脴露篓脧貌
+        char *output;   // 脢盲鲁枚脰脴露篓脧貌
     } SimpleCmd;
 
     typedef struct History {
-        int start;                    //首位置
-        int end;                      //末位置
-        char cmds[HISTORY_LEN][100];  //历史命令
+        int start;                    //脢脳脦禄脰脙
+        int end;                      //脛漏脦禄脰脙
+        char cmds[HISTORY_LEN][100];  //脌煤脢路脙眉脕卯
     } History;
 
     typedef struct Job {
-        int pid;          //进程号
-        char cmd[100];    //命令名
-        char state[10];   //作业状态
-        struct Job *next; //下一节点指针
+        int pid;          //陆酶鲁脤潞脜
+        char cmd[100];    //脙眉脕卯脙没
+        char state[10];   //脳梅脪碌脳麓脤卢
+        struct Job *next; //脧脗脪禄陆脷碌茫脰赂脮毛
     } Job;
     
-    char inputBuff[100];  //存放输入的命令
+    char *inputBuff;  //麓忙路脜脢盲脠毛碌脛脙眉脕卯
     
     void init();
     void addHistory(char *history);
