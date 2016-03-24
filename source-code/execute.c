@@ -210,7 +210,7 @@ void ctrl_Z(){
 
 void tell_grandpa()
 {
-	usleep(300000);
+	//usleep(300000);
 	kill(p_pid, SIGTSTP);
 }
 
@@ -290,7 +290,7 @@ void fg_exec(int pid){
 	while(waitpid(fgPid, NULL, WUNTRACED)<0);
 	tcsetpgrp(0, fg_gid0);
 	/***************************************************/
-
+	usleep(300000);
 }
 
 /*bg命令*/
@@ -758,7 +758,7 @@ void execSimpleCmd(SimpleCmd *cmd){
 			pid = str2Pid(temp, 1, strlen(temp));
 			if (pid != -1){
 				fg_exec(pid);
-				printf("\n");
+				//printf("\n");
 			}
 		}
 		else{
