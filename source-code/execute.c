@@ -606,13 +606,13 @@ void execOuterCmd(SimpleCmd *cmd){
 				printf("[%d]\t%s\t\t%s\n", getpid(), RUNNING, inputBuff);
 				kill(getppid(), SIGUSR1);
 
-				/****************************************************/
+				if (setpgid(0, getpid()) < 0)	//把自己扔到新进程组
+				{
+					printf("failed to build process group\n");
+				}
 			}
 
-			if (setpgid(0, getpid()) < 0)	//把自己扔到新进程组
-			{
-				printf("failed to build process group\n");
-			}
+			
 
 
 
@@ -683,16 +683,20 @@ void execOuterCmd(SimpleCmd *cmd){
 				fgPid = 0; //pid置0，为下一命令做准备
 				addJob(pid); //增加新的作业
 				kill(pid, SIGUSR1); //子进程发信号，表示作业已加入
-
 				//等待子进程输出
 				signal(SIGUSR1, setGoon);
 				while (goon == 0);
 				goon = 0;
 
+				
 			}
 			else
 			{ //非后台命令
 				fgPid = pid;
+				if (setpgid(pid, pid) < 0)	//把自己扔到新进程组
+				{
+					printf("failed to build process group\n");
+				}
 				tcsetpgrp(0, pid);  //把终端控制权交给子进程
 				//printf("%d\n", setpgid(pid, pid));
 				waitpid(pid, NULL, WUNTRACED);  //等待子进程结束    
