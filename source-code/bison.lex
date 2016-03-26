@@ -8,13 +8,13 @@
 
 CHAR [^" "\t\n"<"">""<""|""&"]
 NUM [0-9]
-SYMBOL [">""<""|"]
+SYMBOL [">""<""|""]
 SPACETAB [" "\t]
 
 OP  {SPACETAB}*{CHAR}+{SPACETAB}*
   
-STRING  ({OP}{SYMBOL}?{OP})+
-
+XX ({OP}{SYMBOL}?{OP})+
+STRING   {XX}[&]?
 
 
 %%
